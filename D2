@@ -1,0 +1,58 @@
+TOOLS
+ └── list
+      └── function
+           ├── name
+           ├── description
+           └── parameters
+                ├── type
+                ├── properties
+                │    ├── invoice_number
+                │    ├── quantity
+                │    └── date
+                └── required
+
+import json
+from groq import Groq
+
+client = Groq(api_key="key")
+
+TOOLS = [{
+"type": "function",
+"function": {
+"name": "record_invoice",
+"description": "Record the structured fields extracted from an invoice text.",
+"parameters": {
+"type": "object",
+"properties": {
+"invoice_number": {"type": "string"},
+"quantity": {"type": "integer"},
+"date": {"type": "string", "description": "ISO 8601 date, e.g. 2026-09-01"},
+},
+"required": ["invoice_number", "quantity"],
+},
+},
+}]
+def extract_invoice(raw_text: str) -> dict:
+completion = client.chat.completions.create(
+model="openai/gpt-oss-20b",
+temperature=0,
+messages=[
+{"role": "system", "content": "Extract invoice fields using the record_invoice tool."},
+{"role": "user", "content": raw_text},
+],
+tools=TOOLS,
+tool_choice="required",
+)
+call = completion.choices[0].message.tool_calls[0]
+return json.loads(call.function.arguments)
+if __name__ == "__main__":
+tests = [
+"Invoice INV-2201, qty 480 pcs, dated 1 Sep 2026.",
+"PO INV-3390 -- 1,200 units -- 2026/09/15",
+"Inv# INV-4410, quantity: two hundred, no date given",
+
+for t in tests:
+print(t, "->", extract_invoice(t))
+"INV-5521 dated Sep 20 2026, either 300 or 320 pcs (unclear)",
+"record: invoice=INV-6630; qty=75; date=15-09-2026",
+]
